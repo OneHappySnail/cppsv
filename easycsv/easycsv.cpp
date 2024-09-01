@@ -56,7 +56,11 @@ public:
   ///
   /// @brief Constructor for a double value.
   ///
-  Field(double value) : value_(std::to_string(value)){};
+  Field(double value) : value_("") {
+    std::stringstream ss;
+    ss << value;
+    this->value_ = ss.str();
+  };
 
   ///
   /// @brief Constructor for a const char* value.
