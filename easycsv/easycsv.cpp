@@ -39,6 +39,38 @@ private:
 };
 
 ///
+/// @brief Custom exception for out of bound row access.
+///
+class OutOfBoundRowAccessException : public std::exception {
+public:
+  OutOfBoundRowAccessException(const int num_rows, const int index)
+      : message_{"Failed to access row at index " + std::to_string(index) +
+                 " because the Csv only contains " + std::to_string(num_rows) +
+                 " rows"} {};
+
+  const char *what() const override { return this->message_.c_str(); };
+
+private:
+  std::string message_;
+};
+
+///
+/// @brief Custom exception for out of bound row access.
+///
+class OutOfBoundFieldAccessException : public std::exception {
+public:
+  OutOfBoundFieldAccessException(const int width, const int index)
+      : message_{"Failed to access field value at index " +
+                 std::to_string(index) + " because the Row only contains " +
+                 std::to_string(width) + " fields"} {};
+
+  const char *what() const override { return this->message_.c_str(); };
+
+private:
+  std::string message_;
+};
+
+///
 /// @brief A Field represents an individual value in the CSV.
 ///
 class Field {
@@ -99,6 +131,18 @@ public:
   }
 
   ///
+  /// @brief Enable vector-like value access for fields in the row.
+  ///
+  std::string &operator[](int index) {
+    if (this->Width() < index + 1) {
+      throw OutOfBoundFieldAccessException(static_cast<int>(this->Width()),
+                                           index);
+    }
+    this->field_value_cache_ = this->fields_.at(index).GetValue();
+    return this->field_value_cache_;
+  }
+
+  ///
   /// @brief Returns an iterator pointing to the first field in the row.
   ///
   auto Begin() const { return this->fields_.begin(); };
@@ -115,6 +159,7 @@ public:
 
 private:
   std::vector<Field> fields_;
+  std::string field_value_cache_;
 };
 
 ///
@@ -126,6 +171,17 @@ public:
   Csv() = default;
 
   Csv(const char separator) : separator_(separator){};
+
+  ///
+  /// @brief Enable vector-like row access.
+  ///
+  Row &operator[](int index) {
+    if (this->RowCount() < index + 1) {
+      throw OutOfBoundRowAccessException(static_cast<int>(this->RowCount()),
+                                         index);
+    }
+    return this->rows_.at(index);
+  }
 
   ///
   /// @brief Adds a new data row to the CSV.
