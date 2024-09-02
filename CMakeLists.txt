@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
 
-project(easycsv)
+project(cppsv)
 
-add_executable(easycsv easycsv/easycsv.cpp)
+add_executable(cppsv cppsv/cppsv.cpp)
