@@ -3,6 +3,7 @@
 #include <initializer_list>
 #include <ios>
 #include <iostream>
+#include <iterator>
 #include <sstream>
 #include <string>
 #include <vector>
@@ -72,6 +73,7 @@ private:
 
 ///
 /// @brief A Field represents an individual value in the CSV.
+/// All values are stored as std::string.
 ///
 class Field {
 public:
@@ -100,19 +102,39 @@ public:
   Field(const char *value) : value_(value){};
 
   ///
+  /// @brief Returns the field
+  ///
+  std::string GetValue() const { return this->value_; }
+
+  ///
   /// @brief Returns the field value with escaped separator and/or new line
   /// characters.
   ///
   std::string GetValue(const char separator) const {
-    // Quote value if it contains the separator
-    if (this->value_.find(separator) != std::string::npos) {
-      return "\"" + this->value_ + "\"";
+    auto escaped_value{this->value_};
+    // Quote value if it contains the separator, a new line character but only
+    // if it is not yet quoted.
+    if ((this->value_.find(separator) != std::string::npos ||
+         this->value_.find('\n') != std::string::npos) &&
+        this->value_[0] != '"' &&
+        this->value_[this->value_.size() - 1] != '"') {
+      escaped_value = "\"" + this->value_ + "\"";
     }
-    // Quote value if it contains line breaks
-    if (this->value_.find('\n') != std::string::npos) {
-      return "\"" + this->value_ + "\"";
+    // Add additional quotes for quotes within the value
+    if (escaped_value.find('"') != std::string::npos) {
+      for (auto it = escaped_value.begin(); it != escaped_value.end(); ++it) {
+        // Leave quotes at the beginning and end of the value
+        if (it == escaped_value.begin() || it == (escaped_value.end() - 1)) {
+          continue;
+        }
+        if (*it == '"') {
+          escaped_value.insert(std::distance(escaped_value.begin(), it), 1,
+                               '"');
+          ++it;
+        }
+      }
     }
-    return this->value_;
+    return escaped_value;
   }
 
 private:
@@ -124,8 +146,8 @@ private:
 ///
 class Row {
 public:
-  Row(std::initializer_list<Field> values) {
-    for (const auto value : values) {
+  Row(std::initializer_list<Field> &values) {
+    for (const auto &value : values) {
       this->fields_.push_back(value);
     }
   }
@@ -168,8 +190,15 @@ private:
 ///
 class Csv {
 public:
+  ///
+  /// @brief Default constructor creating a Csv with the default separator ","
+  /// (comma).
+  ///
   Csv() = default;
 
+  ///
+  /// @brief Constructor to create a Csv with a custom separator.
+  ///
   Csv(const char separator) : separator_(separator){};
 
   ///
@@ -201,9 +230,9 @@ public:
   /// AddDataRow() an InvalidHeaderRowInsertionException will be trown.
   ///
   void AddHeaderRow(std::initializer_list<Field> values) {
-    if (!this->rows_.empty()) {
+    if (!this->Empty()) {
       throw InvalidHeaderRowInsertionException(
-          static_cast<int>(this->rows_.size() + 1));
+          static_cast<int>(this->RowCount()));
     }
     const Row header_row(values);
     this->InitializeWidth(header_row.Width());
@@ -212,19 +241,57 @@ public:
   }
 
   ///
-  /// @brief Prints the whole CSV data to stdandard output.
+  /// @brief Returns an iterator pointing to the first Row in the Csv.
+  ///
+  auto Begin() const { return this->rows_.begin(); }
+
+  ///
+  /// @brief Returns an iterator pointing to the end of the rows in the Csv.
+  ///
+  auto End() const { return this->rows_.end(); }
+
+  ///
+  /// @brief Returns true if the Csv contains no Rows, otherwise false.
+  /// It also returns false if the Csv only contains a header row.
+  ///
+  bool Empty() const {
+    if (!this->has_header_row_) {
+      return this->rows_.empty();
+    }
+    return ((this->rows_.size() - 1) != 0);
+  }
+
+  ///
+  /// @brief Prints the whole CSV data to standard output including the header
+  /// row if present.
   ///
   void Print() {
-    for (const auto row : this->rows_) {
-      std::stringstream row_stream;
+    for (const auto &row : this->rows_) {
       for (auto it = row.Begin(); it != row.End(); ++it) {
-        row_stream << it->GetValue(this->separator_);
+        std::cout << it->GetValue(this->separator_);
         if ((it + 1) != row.End()) {
-          row_stream << this->separator_;
+          std::cout << this->separator_;
         }
       }
-      row_stream << "\n";
-      std::cout << row_stream.str();
+      std::cout << "\n";
+    }
+  }
+
+  ///
+  /// @brief Prints the whole CSV data to standard output without the header
+  /// row.
+  ///
+  void PrintDataOnly() {
+    auto start_pos =
+        this->has_header_row_ ? this->rows_.begin() + 1 : this->rows_.begin();
+    for (auto it = start_pos; it != this->End(); ++it) {
+      for (auto field = it->Begin(); field != it->End(); ++field) {
+        std::cout << field->GetValue(this->separator_);
+        if ((field + 1) != it->End()) {
+          std::cout << this->separator_;
+        }
+      }
+      std::cout << "\n";
     }
   }
 
@@ -232,11 +299,12 @@ public:
   /// @brief Saves the CSV to a file.
   ///
   void SaveToFile(const std::string &file_path) {
-    std::ofstream file_stream(file_path);
-    for (const auto row : this->rows_) {
-      for (auto it = row.Begin(); it != row.End(); ++it) {
-        file_stream << it->GetValue(this->separator_);
-        if ((it + 1) != row.End()) {
+    std::ofstream file_stream;
+    file_stream.open(file_path);
+    for (auto row = this->Begin(); row != this->End(); ++row) {
+      for (auto field = row->Begin(); field != row->End(); ++field) {
+        file_stream << field->GetValue(this->separator_);
+        if (std::next(field) != row->End()) {
           file_stream << this->separator_;
         }
       }
@@ -263,9 +331,9 @@ private:
   /// either AddHeaderRow() or AddDataRow().
   ///
   void InitializeWidth(const size_t width) {
-    if (this->is_width_initialized == false) {
+    if (this->IsWidthInitialized() == false) {
       this->max_width_ = width;
-      is_width_initialized = true;
+      this->is_width_initialized = true;
     }
   }
 
@@ -282,35 +350,30 @@ private:
 
   ///
   /// @brief Returns the maximum allowed width for rows.
+  /// Returns 0 if called before inserting the first row.
   ///
   size_t MaxWidth() const { return this->max_width_; }
+
+  ///
+  /// @brief Returns the number of rows.
+  ///
+  size_t RowCount() const { return this->rows_.size(); };
 };
 
 class CsvParser {
 public:
-  void Parse(const std::string file_path) {
+  Csv Parse(const std::string file_path) {
     std::ifstream file_stream;
     file_stream.open(file_path);
-
     file_stream.seekg(0, std::ios::end);
-    auto file_length = file_stream.tellg();
+    const auto file_length = file_stream.tellg();
     file_stream.seekg(0, std::ios::beg);
-
-    const size_t buffer_size = 10;
-    char buffer[buffer_size];
-
-    while (file_stream.read(buffer, buffer_size)) {
-      std::streamsize bytes_read = file_stream.gcount();
-      std::cout.write(buffer, bytes_read);
-      std::cout << "\n\n";
+    char byte;
+    while (file_stream.get(byte)) {
+      std::cout << byte << "\n";
     }
-
-    std::streamsize bytes_read = file_stream.gcount();
-    if (bytes_read > 0) {
-      std::cout.write(buffer, bytes_read);
-    }
-    file_stream.close();
-  };
+    return Csv();
+  }
 
 private:
   Csv csv_;
@@ -318,19 +381,27 @@ private:
 
 int main(int argc, char *argv[]) {
   try {
-    /*Csv csv;
+    Csv csv;
     csv.AddHeaderRow({"one", "two", "three", "four"});
     csv.AddDataRow({"\"hello\"", "csv", 123, 1.234});
-    csv.AddDataRow({"hel,lo", "csv", 123, 1.234});
+    csv.AddDataRow({"hel,lo", "cs\"v", 123, 1.234});
+    csv.AddDataRow(
+        {"I am a \"scentence\",\nwith a line break", "cs\"v", 123, 1.234});
+
+    auto val = csv[0][0];
+    std::cout << "value at at row index 0, at value index 0 = " << val << "\n";
     csv.Print();
+    csv.PrintDataOnly();
+
+    /*
     Csv csv2(';');
     csv2.AddHeaderRow({"one", "two", "three", "four"});
     csv2.AddDataRow({"\"hello\"", "csv\niscool", 123, 1.234});
     csv2.AddDataRow({"hel;lo", "csv", 123, 1.234});
     csv2.SaveToFile("./test.csv");*/
 
-    CsvParser csv_parser;
-    csv_parser.Parse("test.csv");
+    /*   CsvParser csv_parser;
+       csv_parser.Parse("test.csv");*/
 
   } catch (const std::exception &ex) {
     std::cout << ex.what() << "\n";
