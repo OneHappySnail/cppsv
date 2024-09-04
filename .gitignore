@@ -1,4 +1,5 @@
 /build
 *.csv
 *.cmd
+*.sh
 compile-flags.txt
