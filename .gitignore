@@ -4,4 +4,3 @@
 *.sh
 main.cpp
 compile-flags.txt
-CMakeLists.txt
