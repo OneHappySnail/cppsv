@@ -1,4 +1,5 @@
 #include "csvpp.hpp"
+
 #include "gtest/gtest.h"
 
 // Unit tests for the Field class public interface.
@@ -54,7 +55,7 @@ TEST(Field, GetValueEscapedQuotedQuote) {
 
 // Test fixture for the Row class
 class RowTest : public testing::Test {
-protected:
+ protected:
   RowTest() {
     row0_.AddValue("value1");
     row0_.AddValue("value2");
@@ -71,7 +72,6 @@ TEST(RowTest, AddAndGetValue) {
 }
 
 TEST(RowTest, OutOfBoundFieldAccessException) {
-
   csvpp::Row row({"value1", "value2", "value3"});
   bool did_catch_exception{false};
   try {
@@ -86,14 +86,14 @@ TEST(RowTest, OutOfBoundFieldAccessException) {
 
 TEST(RowTest, InitializerListConstructorAndWidth) {
   csvpp::Row row({"value1", "value2", "value3"});
-  EXPECT_EQ(static_cast<int>(row.Width()), 3);
+  EXPECT_EQ(static_cast<int>(row.GetWidth()), 3);
 }
 
 TEST(RowTest, ClearRow) {
   csvpp::Row row({"value1", "value2", "value3"});
-  EXPECT_EQ(static_cast<int>(row.Width()), 3);
+  EXPECT_EQ(static_cast<int>(row.GetWidth()), 3);
   row.Clear();
-  EXPECT_EQ(static_cast<int>(row.Width()), 0);
+  EXPECT_EQ(static_cast<int>(row.GetWidth()), 0);
 }
 
 TEST(RowTest, Iterators) {
@@ -108,7 +108,7 @@ TEST(RowTest, Iterators) {
 // Unit tests for Csv class public interface.
 
 class CsvTest : public testing::Test {
-protected:
+ protected:
   CsvTest() {
     this->csv_with_header_.AddHeaderRow({"header1", "header2", "header3"});
     this->csv_with_header_.AddDataRow({"value1_1", "value1_2", "value1_3"});
@@ -177,7 +177,7 @@ TEST_F(CsvTest, GetHeaderRow) {
   bool is_header_row{true};
   auto header_row = csv_with_header_.GetHeaderRow();
   std::vector<std::string> header_row_should{"header1", "header2", "header3"};
-  for (int i = 0; i < static_cast<int>(header_row.Width()); ++i) {
+  for (int i = 0; i < static_cast<int>(header_row.GetWidth()); ++i) {
     is_header_row = header_row.ValueAt(i) == header_row_should.at(i);
   }
   EXPECT_TRUE(is_header_row);
@@ -185,5 +185,5 @@ TEST_F(CsvTest, GetHeaderRow) {
 
 TEST_F(CsvTest, GetEmptyRowForHeadlesCsv) {
   auto header = csv_data_only_.GetHeaderRow();
-  EXPECT_EQ(static_cast<int>(header.Width()), 0);
+  EXPECT_EQ(static_cast<int>(header.GetWidth()), 0);
 }

@@ -1,7 +1,3 @@
 /build
-*.csv
-*.cmd
-*.sh
-main.cpp
 compile_flags.txt
 csvpp/gtest
