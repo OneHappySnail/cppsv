@@ -1,4 +1,3 @@
-//
 //     _____    _____  __      __  _____    _____
 //    / ____|  / ____| \ \    / / |  __ \  |  __ \
 //   | |      | (___    \ \  / /  | |__) | | |__) |
@@ -18,8 +17,8 @@
 // copies of the Software, and to permit persons to whom the Software is
 // furnished to do so, subject to the following conditions:
 //
-// The above copyright notice and this permission notice shall be included in all
-// copies or substantial portions of the Software.
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
 //
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 // IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
@@ -28,7 +27,6 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-//
 
 #ifndef CSVPP_HPP
 #define CSVPP_HPP
@@ -46,14 +44,13 @@
 
 namespace csvpp {
 
-///
-/// @brief Exception for insertion of rows with invalid width.
-///
+/// Exception for insertion of rows with invalid width.
 class InvalidRowWidthException : public std::exception {
  public:
-  InvalidRowWidthException(const int max_width, const int row_width)
-      : message_{"Invalid attempt to insert row of width " + std::to_string(row_width) +
-                 " when maximum allowed width is " + std::to_string(max_width)} {}
+  InvalidRowWidthException(const size_t max_width, const size_t row_width)
+      : message_{"Invalid attempt to insert row of width " +
+                 std::to_string(row_width) + " when width must be " +
+                 std::to_string(max_width)} {}
 
   const char *what() const noexcept override { return this->message_.c_str(); };
 
@@ -61,13 +58,12 @@ class InvalidRowWidthException : public std::exception {
   std::string message_;
 };
 
-///
-/// @brief Exception for insertion of a header row at non-zero index.
-///
+/// Exception for insertion of a header row at non-zero index.
 class InvalidHeaderRowInsertionException : public std::exception {
  public:
-  InvalidHeaderRowInsertionException(const int current_row_count)
-      : message_{"Invalid attempt to set header row at row index " + std::to_string(current_row_count + 1)} {};
+  InvalidHeaderRowInsertionException(const size_t current_row_count)
+      : message_{"Invalid attempt to set header row at row index " +
+                 std::to_string(current_row_count + 1)} {};
 
   const char *what() const noexcept override { return this->message_.c_str(); };
 
@@ -75,14 +71,13 @@ class InvalidHeaderRowInsertionException : public std::exception {
   std::string message_;
 };
 
-///
-/// @brief Exception for out of bound row access.
-///
+/// Exception for out of bound row access.
 class OutOfBoundRowAccessException : public std::exception {
  public:
-  OutOfBoundRowAccessException(const int num_rows, const int index)
-      : message_{"Failed to access row at index " + std::to_string(index) + " because the Csv only contains " +
-                 std::to_string(num_rows) + " rows"} {};
+  OutOfBoundRowAccessException(const int num_rows, const size_t index)
+      : message_{"Failed to access row at index " + std::to_string(index) +
+                 " because the Csv only contains " + std::to_string(num_rows) +
+                 " rows"} {};
 
   const char *what() const noexcept override { return this->message_.c_str(); };
 
@@ -90,20 +85,22 @@ class OutOfBoundRowAccessException : public std::exception {
   std::string message_;
 };
 
+// Expection for invalid row access to empty Csv.
 class EmptyCsvRowAccessException : public std::exception {
  public:
   EmptyCsvRowAccessException() = default;
 
-  const char *what() const noexcept override { return "Failed to access row because the Csv is empty"; };
+  const char *what() const noexcept override {
+    return "Failed to access row because the Csv is empty";
+  };
 };
 
-///
-/// @brief Custom exception for out of bound row access.
-///
+/// Custom exception for out of bound row access.
 class OutOfBoundFieldAccessException : public std::exception {
  public:
-  OutOfBoundFieldAccessException(const int width, const int index)
-      : message_{"Failed to access field value at index " + std::to_string(index) + " because the Row only contains " +
+  OutOfBoundFieldAccessException(const size_t width, const int index)
+      : message_{"Failed to access field value at index " +
+                 std::to_string(index) + " because the Row only contains " +
                  std::to_string(width) + " fields"} {};
 
   const char *what() const noexcept override { return this->message_.c_str(); };
@@ -112,25 +109,17 @@ class OutOfBoundFieldAccessException : public std::exception {
   std::string message_;
 };
 
-///
-/// @brief A Field represents an individual value in the CSV.
+/// A Field represents an individual value in the CSV.
 /// All values are stored as std::string.
-///
 class Field {
  public:
-  ///
-  /// @brief Constructor for a string value.
-  ///
+  /// Constructor for a string value.
   Field(std::string value) : value_(value){};
 
-  ///
-  /// @brief Constructor for an integer value.
-  ///
+  /// Constructor for an integer value.
   Field(int value) : value_(std::to_string(value)){};
 
-  ///
-  /// @brief Constructor for a double value.
-  ///
+  /// Constructor for a double value.
   Field(double value) : value_("") {
     // The stream gets rid of trailing zeros.
     std::stringstream ss;
@@ -138,221 +127,167 @@ class Field {
     this->value_ = ss.str();
   };
 
-  ///
-  /// @brief Constructor for a const char* value.
-  ///
-  Field(const char *value) : value_(value){};
+  /// Constructor for a const char* value.
+  Field(const char value[]) : value_(value){};
 
-  ///
-  /// @brief Returns the field
-  ///
+  /// Returns the field
   std::string GetValue() const { return this->value_; }
 
-  ///
-  /// @brief Returns the field value with escaped separator and/or new line
+  /// Returns the field value with escaped separator and/or new line
   /// characters.
-  ///
   std::string GetValueEscaped(const char separator) const {
     auto escaped_value{this->value_};
-    // Quote value if it contains the separator, a new line character but only
-    // if it is not yet quoted.
-    if ((this->value_.find(separator) != std::string::npos || this->value_.find('\n') != std::string::npos) &&
-        this->value_[0] != '"' && this->value_[this->value_.size() - 1] != '"') {
-      escaped_value = "\"" + this->value_ + "\"";
-    }
-    // Add additional quotes for quotes within the value
-    if (escaped_value.find('"') != std::string::npos) {
-      for (auto it = escaped_value.begin(); it != escaped_value.end(); ++it) {
-        // Leave quotes at the beginning and end of the value
-        if (it == escaped_value.begin() || it == (escaped_value.end() - 1)) {
-          continue;
-        }
-        if (*it == '"') {
-          escaped_value.insert(std::distance(escaped_value.begin(), it), 1, '"');
-          ++it;
-        }
-      }
-    }
+    this->QuoteValueIfNeeded(escaped_value, separator);
+    this->EscapeQuotesWithinValue(escaped_value);
     return escaped_value;
   }
 
  private:
   std::string value_;
+
+  // Quote value if it contains the separator or a new line character but only
+  // if it is not yet quoted.
+  void QuoteValueIfNeeded(std::string &value, const char separator) const {
+    if ((this->value_.find(separator) != std::string::npos ||
+         this->value_.find('\n') != std::string::npos) &&
+        this->value_[0] != '"' &&
+        this->value_[this->value_.size() - 1] != '"') {
+      value = "\"" + this->value_ + "\"";
+    }
+  }
+
+  // Add additional quotes for quotes within the value
+  void EscapeQuotesWithinValue(std::string &value) const {
+    if (value.find('"') != std::string::npos) {
+      for (auto character = value.begin(); character != value.end();
+           ++character) {
+        // Leave quotes at the beginning and end of the value
+        if (character == value.begin() || character == (value.end() - 1)) {
+          continue;
+        }
+        if (*character == '"') {
+          value.insert(std::distance(value.begin(), character), 1, '"');
+          ++character;
+        }
+      }
+    }
+  }
 };
 
-///
-/// @brief A Row represents an individual row in the CSV and contains Fields.
-///
+/// A Row represents an individual row in the CSV and contains Fields.
 class Row {
  public:
-  ///
-  /// @brief Default constructor.
-  ///
+  /// Default constructor.
   Row() = default;
 
-  ///
-  /// @brief Constructor for easy field value insertion.
-  ///
+  /// Constructor for easy field value insertion.
   Row(std::initializer_list<Field> values) {
     for (const auto &value : values) {
       this->fields_.push_back(value);
     }
   }
 
-  ///
-  /// @brief Enable vector-like value access for fields in the row.
-  ///
-  std::string &operator[](int index) {
-    if (index > this->Width() - 1) {
-      throw OutOfBoundFieldAccessException(static_cast<int>(this->Width()), index);
-    }
-    this->field_value_cache_ = this->fields_.at(index).GetValue();
-    return this->field_value_cache_;
-  }
-
-  ///
-  /// @brief Adds the value to the row
-  ///
+  /// Adds the value to the row
   void AddValue(const Field &field) { this->fields_.push_back(field); }
 
-  ///
-  /// @brief Returns the value at the field index.
-  ///
-  std::string ValueAt(const int index) {
-    if (index > this->Width() - 1) {
-      throw OutOfBoundFieldAccessException(static_cast<int>(this->Width()), index);
+  /// Returns the value at the field index.
+  std::string ValueAt(const int index) const {
+    if (index > this->GetWidth() - 1) {
+      throw OutOfBoundFieldAccessException(this->GetWidth(), index);
     }
     return this->fields_[static_cast<size_t>(index)].GetValue();
   }
 
-  ///
-  /// @brief Clears the row
-  ///
+  /// Clears the row
   void Clear() { this->fields_.clear(); }
 
-  ///
-  /// @brief Returns an iterator pointing to the first field in the row.
-  ///
+  /// Returns an iterator pointing to the first field in the row.
   auto Begin() const { return this->fields_.begin(); };
 
-  ///
-  /// @brief Returns an iterator pointing to the end of the fields in the row.
-  ///
+  /// Returns an iterator pointing to the end of the fields in the row.
   auto End() const { return this->fields_.end(); };
 
-  ///
-  /// @brief Returns the with aka. number of fields in the row.
-  ///
-  size_t Width() const { return this->fields_.size(); };
+  /// Returns the with aka. number of fields in the row.
+  size_t GetWidth() const { return this->fields_.size(); };
+
+  /// Returns true if the Row does not contain any fields, otherwise false.
+  bool IsEmpty() const { return this->fields_.empty(); };
 
  private:
   std::vector<Field> fields_;
   std::string field_value_cache_;
 };
 
-///
-/// @brief A CSV contains rows with fields and provides a simple interface to
-/// build in-memory CSVs.
-///
+/// A CSV contains rows with fields and provides a simple interface to build
+/// in-memory CSVs.
 class Csv {
  public:
-  ///
-  /// @brief Default constructor creating a Csv with the default separator ","
-  /// (comma).
-  ///
-  Csv() = default;
+  /// Constructor to create a Csv with a custom separator.
+  Csv(const char separator = ',') : separator_(separator){};
 
-  ///
-  /// @brief Constructor to create a Csv with a custom separator.
-  ///
-  Csv(const char separator) : separator_(separator){};
-
-  ///
-  /// @brief Enable vector-like row access.
-  ///
-  Row &operator[](int index) {
-    if (index > this->RowCount() - 1) {
-      throw OutOfBoundRowAccessException(static_cast<int>(this->RowCount()), index);
-    }
-    return this->rows_.at(index);
-  }
-  
-  ///
-  /// @brief Adds a new data row to the CSV.
-  ///
+  /// Adds a new data row to the CSV.
   void AddDataRow(const Row &row) {
-    if (this->IsWidthInitialized() && (this->AllowedWidth() != row.Width())) {
-      throw InvalidRowWidthException(static_cast<int>(this->AllowedWidth()), static_cast<int>(row.Width()));
+    if (this->IsWidthInitialized() &&
+        (this->GetAllowedWidth() != row.GetWidth())) {
+      throw InvalidRowWidthException(this->GetAllowedWidth(), row.GetWidth());
     }
-    this->InitializeWidth(row.Width());
+    this->InitializeWidth(row.GetWidth());
     this->PushRow(row);
   }
 
-  ///
-  /// @brief Adds a new data row to the CSV.
-  ///
+  /// Adds a new data row to the CSV.
   void AddDataRow(std::initializer_list<Field> values) {
     const Row row(values);
     this->AddDataRow(row);
   }
 
-  ///
-  /// @brief Adds a header row to the CSV. When calling this method after
-  /// AddDataRow() an InvalidHeaderRowInsertionException will be trown.
-  ///
-  void AddHeaderRow(std::initializer_list<Field> values) {
-    if (!this->Empty()) {
-      throw InvalidHeaderRowInsertionException(static_cast<int>(this->RowCount()));
-    }
-    const Row row(values);
-    this->InitializeWidth(row.Width());
-    this->PushRow(row);
-    this->SetHasHeaderRow();
-  }
-
-  ///
-  /// @brief Adds a header row to the CSV. When calling this method after
-  /// AddDataRow() an InvalidHeaderRowInsertionException will be trown.
-  ///
+  /// Adds a header row to the CSV. When calling this method after AddDataRow()
+  /// an InvalidHeaderRowInsertionException will be trown.
   void AddHeaderRow(const Row &row) {
-    if (!this->Empty()) {
-      throw InvalidHeaderRowInsertionException(static_cast<int>(this->RowCount()));
+    if (!this->IsEmpty()) {
+      throw InvalidHeaderRowInsertionException(this->GetRowCount());
     }
-    this->InitializeWidth(row.Width());
+    this->InitializeWidth(row.GetWidth());
     this->PushRow(row);
     this->SetHasHeaderRow();
   }
 
-  ///
-  /// @brief Returns the row at the specified index. It throws an EmptyCsvRowAccessException when trying to get a row
-  /// from an empty Csv and a OutOfBoundRowAccessException when trying to access a row that is outside the row count.
-  ///
+  /// Adds a header row to the CSV. When calling this method after AddDataRow()
+  /// an InvalidHeaderRowInsertionException will be trown.
+  void AddHeaderRow(std::initializer_list<Field> values) {
+    const Row row(values);
+    this->AddHeaderRow(row);
+  }
+
+  /// Returns the row at the specified index. It throws an
+  /// EmptyCsvRowAccessException when trying to get a row from an empty Csv and
+  /// a OutOfBoundRowAccessException when trying to access a row that is
+  /// outsidethe row count.
   Row RowAt(const int index) const {
-    if (this->Empty()) {
+    if (this->IsEmpty()) {
       throw EmptyCsvRowAccessException();
     }
-    if (this->RowCount() + 1 < index) {
-      throw OutOfBoundRowAccessException(index, static_cast<int>(this->RowCount()));
+    if (this->GetRowCount() + 1 < index) {
+      throw OutOfBoundRowAccessException(index, this->GetRowCount());
     }
     return this->rows_[static_cast<size_t>(index)];
   }
 
-  ///
-  /// @brief Returns the data row at index. If the Csv has a header row and index = 0 is specified, the first row after
-  /// the header row is returned. It throws an EmptyCsvRowAccessException when trying to get a row from an empty Csv and
-  /// a OutOfBoundRowAccessException when trying to access a row that is outside the row count.
-  ///
+  /// Returns the data row at index. If the Csv has a header row and index = 0
+  /// is specified, the first row after the header row is returned. It throws an
+  /// EmptyCsvRowAccessException when trying to get a row from an empty Csv and
+  /// a OutOfBoundRowAccessException when trying to access a row that is outside
+  /// the row count.
   Row DataRowAt(const int index) const {
     int first_data_index = this->has_header_row_ ? index + 1 : index;
     return this->RowAt(first_data_index);
   }
 
-  ///
-  /// @brief Returns the header row or an empty row if there is no header row. It throws an EmptyCsvRowAccessException
-  /// when trying to get a row from an empty Csv.
-  ///
+  /// Returns the header row or an empty row if there is no header row.
+  /// It throws an EmptyCsvRowAccessException when trying to get a row from an
+  /// empty Csv.
   Row GetHeaderRow() const {
-    if (this->Empty()) {
+    if (this->IsEmpty()) {
       throw EmptyCsvRowAccessException();
     }
     if (this->has_header_row_) {
@@ -361,56 +296,42 @@ class Csv {
     return Row();
   }
 
-  ///
-  /// @brief Returns an iterator pointing to the first Row in the Csv.
-  ///
+  /// Returns an iterator pointing to the first Row in the Csv.
   auto Begin() const { return this->rows_.begin(); }
 
-  ///
-  /// @brief Returns an iterator pointing to the end of the rows in the Csv.
-  ///
+  /// Returns an iterator pointing to the end of the rows in the Csv.
   auto End() const { return this->rows_.end(); }
 
-  ///
-  /// @brief Applies the callback to each row in the Csv including the header row if present.
-  ///
-  void ForEachRow(std::function<void(Row)> cb) {
-    for (auto row = this->Begin(); row != this->End(); ++row) {
-      cb(*row);
-    }
-  }
-
-  ///
-  /// @brief Applies the callback to each row in the Csv except the header row.
-  ///
-  void ForEachDataRow(std::function<void(Row)> cb) {
-    auto start_pos = this->has_header_row_ ? this->rows_.begin() + 1 : this->rows_.begin();
-    for (auto it = start_pos; it != this->End(); ++it) {
-      cb(*it);
-    }
-  }
-
-  ///
-  /// @brief Returns true if the Csv contains no Rows, otherwise false.
+  /// Returns true if the Csv contains no Rows, otherwise false.
   /// It also returns false if the Csv only contains a header row.
-  ///
-  bool Empty() const { return this->rows_.empty(); }
+  bool IsEmpty() const { return this->rows_.empty(); }
 
-  ///
-  /// @brief Returns the number of rows.
-  ///
-  size_t RowCount() const { return this->rows_.size(); };
+  /// Returns the number of rows.
+  size_t GetRowCount() const { return this->rows_.size(); };
 
-  ///
-  /// @brief Returns the maximum allowed width for rows.
+  /// Returns the maximum allowed width for rows.
   /// Returns 0 if called before inserting the first row.
-  ///
-  size_t AllowedWidth() const { return this->allowed_width_; }
+  size_t GetAllowedWidth() const { return this->allowed_width_; }
 
-  ///
-  /// @brief Saves the CSV to a file.
-  ///
-  void SaveToFile(const std::string &file_path) {
+  /// Applies the callback to each row in the Csv including the header row if
+  /// present.
+  void ForEachRow(std::function<void(Row)> cb) const {
+    for (auto row = this->Begin(); row != this->End(); ++row) {
+      cb(std::move(*row));
+    }
+  }
+
+  /// Applies the callback to each row in the Csv except the header row.
+  void ForEachDataRow(std::function<void(Row)> cb) const {
+    auto start_pos =
+        this->has_header_row_ ? this->rows_.begin() + 1 : this->rows_.begin();
+    for (auto row = start_pos; row != this->End(); ++row) {
+      cb(std::move(*row));
+    }
+  }
+
+  /// Saves the CSV to a file.
+  void SaveToFile(const std::string &file_path) const {
     std::ofstream file_stream;
     file_stream.open(file_path);
     for (auto row = this->Begin(); row != this->End(); ++row) {
@@ -428,20 +349,16 @@ class Csv {
  private:
   bool has_header_row_ = false;
   bool is_width_initialized = false;
-  char separator_ = ',';
+  char separator_;
   size_t allowed_width_ = 0;
   std::vector<Row> rows_;
 
-  ///
-  /// @brief Sets the header row indicator to true.
-  ///
+  /// Sets the header row indicator to true.
   void SetHasHeaderRow() { this->has_header_row_ = true; }
 
-  ///
-  /// @brief Initializes the maximum allowed width for rows. The maximum allowed
-  /// width is initialized with the width of the first inserted row through
-  /// either AddHeaderRow() or AddDataRow().
-  ///
+  /// Initializes the maximum allowed width for rows. The maximum allowed width
+  /// is initialized with the width of the first inserted row through either
+  /// AddHeaderRow() or AddDataRow().
   void InitializeWidth(const size_t width) {
     if (!this->IsWidthInitialized()) {
       this->allowed_width_ = width;
@@ -449,21 +366,21 @@ class Csv {
     }
   }
 
-  ///
-  /// @brief Returns true if the maximum allowed width is initialized, otherwise
-  /// false.
-  ///
+  /// Returns true if the maximum allowed width is initialized, otherwise false.
   bool IsWidthInitialized() const { return this->is_width_initialized; }
 
-  ///
   /// @brief Inserts a row.
-  ///
   void PushRow(const Row &row) { this->rows_.push_back(row); }
 };
 
+/// CsvParser can read csv text files and parse their content into a Csv.
 class CsvParser {
  public:
-  Csv Parse(const std::string file_path, const char separator = ',', bool has_header_row = true) {
+  /// Parses the specified file into a Csv using the default separator ',' if
+  /// not specified otherwise. By default it expects the csv file to have a
+  /// header row.
+  Csv Parse(const std::string file_path, const char separator = ',',
+            bool has_header_row = true) {
     std::ifstream file_stream;
     file_stream.open(file_path);
 
@@ -474,7 +391,7 @@ class CsvParser {
     constexpr std::streamsize byte_buffer_size = 64 * 1014;
     std::vector<char> byte_buffer(byte_buffer_size);
 
-    const char quote_char{'"'};
+    constexpr char quote_char{'"'};
     bool is_quoted{false};
     std::string field_value{""};
 
@@ -482,7 +399,8 @@ class CsvParser {
     Row row;
 
     while (file_length > 0) {
-      const std::streamsize bytes_to_read = std::min<std::streamsize>(file_length, byte_buffer_size);
+      const std::streamsize bytes_to_read =
+          std::min<std::streamsize>(file_length, byte_buffer_size);
       file_stream.read(byte_buffer.data(), bytes_to_read);
       for (size_t i = 0; i < static_cast<int>(bytes_to_read); ++i) {
         if (byte_buffer[i] == quote_char) {
@@ -508,7 +426,7 @@ class CsvParser {
             this->SanitizeCellValue(field_value);
             Field field(field_value);
             row.AddValue(field);
-            if (csv.Empty() && has_header_row) {
+            if (csv.IsEmpty() && has_header_row) {
               csv.AddHeaderRow(row);
             } else {
               csv.AddDataRow(row);
@@ -522,11 +440,14 @@ class CsvParser {
       }
       file_length -= bytes_to_read;
     }
+    // TODO Handle end of file
     return csv;
   }
 
  private:
-  void SanitizeCellValue(std::string &value) {
+  // Removes quotes at the beginning and end of a value and replaces escaped
+  // quotes with single quotes. The expected quote character is '"'.
+  void SanitizeCellValue(std::string &value) const {
     // Remove begin and end quotes,
     if (value[0] == '"' && value[value.size() - 1] == '"') {
       value = value.substr(1, value.size() - 2);
