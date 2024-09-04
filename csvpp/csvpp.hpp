@@ -276,12 +276,11 @@ class Csv {
     }
     return this->rows_.at(index);
   }
-
+  
   ///
   /// @brief Adds a new data row to the CSV.
   ///
-  void AddDataRow(std::initializer_list<Field> values) {
-    const Row row(values);
+  void AddDataRow(const Row &row) {
     if (this->IsWidthInitialized() && (this->AllowedWidth() != row.Width())) {
       throw InvalidRowWidthException(static_cast<int>(this->AllowedWidth()), static_cast<int>(row.Width()));
     }
@@ -292,12 +291,9 @@ class Csv {
   ///
   /// @brief Adds a new data row to the CSV.
   ///
-  void AddDataRow(const Row &row) {
-    if (this->IsWidthInitialized() && (this->AllowedWidth() != row.Width())) {
-      throw InvalidRowWidthException(static_cast<int>(this->AllowedWidth()), static_cast<int>(row.Width()));
-    }
-    this->InitializeWidth(row.Width());
-    this->PushRow(row);
+  void AddDataRow(std::initializer_list<Field> values) {
+    const Row row(values);
+    this->AddDataRow(row);
   }
 
   ///
@@ -347,14 +343,8 @@ class Csv {
   /// a OutOfBoundRowAccessException when trying to access a row that is outside the row count.
   ///
   Row DataRowAt(const int index) const {
-    if (this->Empty()) {
-      throw EmptyCsvRowAccessException();
-    }
     int first_data_index = this->has_header_row_ ? index + 1 : index;
-    if (this->RowCount() + 1 < first_data_index) {
-      throw OutOfBoundRowAccessException(first_data_index, static_cast<int>(this->RowCount()));
-    }
-    return this->rows_[static_cast<size_t>(first_data_index)];
+    return this->RowAt(first_data_index);
   }
 
   ///
