@@ -1,5 +1,41 @@
+//
+//     _____    _____  __      __  _____    _____
+//    / ____|  / ____| \ \    / / |  __ \  |  __ \
+//   | |      | (___    \ \  / /  | |__) | | |__) |
+//   | |       \___ \    \ \/ /   |  ___/  |  ___/
+//   | |____   ____) |    \  /    | |      | |
+//    \_____| |_____/      \/     |_|      |_|
+//
+//
+// MIT License
+//
+// Copyright (c) 2019 Pranav
+//
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
+//
+// The above copyright notice and this permission notice shall be included in all
+// copies or substantial portions of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
+//
+
+#ifndef CSVPP_HPP
+#define CSVPP_HPP
+
 #include <exception>
 #include <fstream>
+#include <functional>
 #include <initializer_list>
 #include <ios>
 #include <iostream>
@@ -8,8 +44,10 @@
 #include <string>
 #include <vector>
 
+namespace csvpp {
+
 ///
-/// @brief Custom exception for insertion of rows with invalid width.
+/// @brief Exception for insertion of rows with invalid width.
 ///
 class InvalidRowWidthException : public std::exception {
  public:
@@ -24,7 +62,7 @@ class InvalidRowWidthException : public std::exception {
 };
 
 ///
-/// @brief Custom exception for insertion of a header row at non-zero index.
+/// @brief Exception for insertion of a header row at non-zero index.
 ///
 class InvalidHeaderRowInsertionException : public std::exception {
  public:
@@ -38,7 +76,7 @@ class InvalidHeaderRowInsertionException : public std::exception {
 };
 
 ///
-/// @brief Custom exception for out of bound row access.
+/// @brief Exception for out of bound row access.
 ///
 class OutOfBoundRowAccessException : public std::exception {
  public:
@@ -94,6 +132,7 @@ class Field {
   /// @brief Constructor for a double value.
   ///
   Field(double value) : value_("") {
+    // The stream gets rid of trailing zeros.
     std::stringstream ss;
     ss << value;
     this->value_ = ss.str();
@@ -113,7 +152,7 @@ class Field {
   /// @brief Returns the field value with escaped separator and/or new line
   /// characters.
   ///
-  std::string GetValue(const char separator) const {
+  std::string GetValueEscaped(const char separator) const {
     auto escaped_value{this->value_};
     // Quote value if it contains the separator, a new line character but only
     // if it is not yet quoted.
@@ -146,8 +185,14 @@ class Field {
 ///
 class Row {
  public:
+  ///
+  /// @brief Default constructor.
+  ///
   Row() = default;
 
+  ///
+  /// @brief Constructor for easy field value insertion.
+  ///
   Row(std::initializer_list<Field> values) {
     for (const auto &value : values) {
       this->fields_.push_back(value);
@@ -158,7 +203,7 @@ class Row {
   /// @brief Enable vector-like value access for fields in the row.
   ///
   std::string &operator[](int index) {
-    if (this->Width() < index + 1) {
+    if (index > this->Width() - 1) {
       throw OutOfBoundFieldAccessException(static_cast<int>(this->Width()), index);
     }
     this->field_value_cache_ = this->fields_.at(index).GetValue();
@@ -174,7 +219,7 @@ class Row {
   /// @brief Returns the value at the field index.
   ///
   std::string ValueAt(const int index) {
-    if (this->Width() < index + 1) {
+    if (index > this->Width() - 1) {
       throw OutOfBoundFieldAccessException(static_cast<int>(this->Width()), index);
     }
     return this->fields_[static_cast<size_t>(index)].GetValue();
@@ -226,7 +271,7 @@ class Csv {
   /// @brief Enable vector-like row access.
   ///
   Row &operator[](int index) {
-    if (this->RowCount() < index + 1) {
+    if (index > this->RowCount() - 1) {
       throw OutOfBoundRowAccessException(static_cast<int>(this->RowCount()), index);
     }
     return this->rows_.at(index);
@@ -283,7 +328,8 @@ class Csv {
   }
 
   ///
-  /// @brief Returns the row at the specified index.
+  /// @brief Returns the row at the specified index. It throws an EmptyCsvRowAccessException when trying to get a row
+  /// from an empty Csv and a OutOfBoundRowAccessException when trying to access a row that is outside the row count.
   ///
   Row RowAt(const int index) const {
     if (this->Empty()) {
@@ -297,7 +343,8 @@ class Csv {
 
   ///
   /// @brief Returns the data row at index. If the Csv has a header row and index = 0 is specified, the first row after
-  /// the header row is returned.
+  /// the header row is returned. It throws an EmptyCsvRowAccessException when trying to get a row from an empty Csv and
+  /// a OutOfBoundRowAccessException when trying to access a row that is outside the row count.
   ///
   Row DataRowAt(const int index) const {
     if (this->Empty()) {
@@ -311,7 +358,8 @@ class Csv {
   }
 
   ///
-  /// @brief Returns the header row or an empty row if there is no header row.
+  /// @brief Returns the header row or an empty row if there is no header row. It throws an EmptyCsvRowAccessException
+  /// when trying to get a row from an empty Csv.
   ///
   Row GetHeaderRow() const {
     if (this->Empty()) {
@@ -334,6 +382,25 @@ class Csv {
   auto End() const { return this->rows_.end(); }
 
   ///
+  /// @brief Applies the callback to each row in the Csv including the header row if present.
+  ///
+  void ForEachRow(std::function<void(Row)> cb) {
+    for (auto row = this->Begin(); row != this->End(); ++row) {
+      cb(*row);
+    }
+  }
+
+  ///
+  /// @brief Applies the callback to each row in the Csv except the header row.
+  ///
+  void ForEachDataRow(std::function<void(Row)> cb) {
+    auto start_pos = this->has_header_row_ ? this->rows_.begin() + 1 : this->rows_.begin();
+    for (auto it = start_pos; it != this->End(); ++it) {
+      cb(*it);
+    }
+  }
+
+  ///
   /// @brief Returns true if the Csv contains no Rows, otherwise false.
   /// It also returns false if the Csv only contains a header row.
   ///
@@ -351,39 +418,6 @@ class Csv {
   size_t AllowedWidth() const { return this->allowed_width_; }
 
   ///
-  /// @brief Prints the whole CSV data to standard output including the header
-  /// row if present.
-  ///
-  void Print() {
-    for (const auto &row : this->rows_) {
-      for (auto it = row.Begin(); it != row.End(); ++it) {
-        std::cout << it->GetValue(this->separator_);
-        if ((it + 1) != row.End()) {
-          std::cout << this->separator_;
-        }
-      }
-      std::cout << "\n";
-    }
-  }
-
-  ///
-  /// @brief Prints the whole CSV data to standard output without the header
-  /// row.
-  ///
-  void PrintDataOnly() {
-    auto start_pos = this->has_header_row_ ? this->rows_.begin() + 1 : this->rows_.begin();
-    for (auto it = start_pos; it != this->End(); ++it) {
-      for (auto field = it->Begin(); field != it->End(); ++field) {
-        std::cout << field->GetValue(this->separator_);
-        if ((field + 1) != it->End()) {
-          std::cout << this->separator_;
-        }
-      }
-      std::cout << "\n";
-    }
-  }
-
-  ///
   /// @brief Saves the CSV to a file.
   ///
   void SaveToFile(const std::string &file_path) {
@@ -391,7 +425,7 @@ class Csv {
     file_stream.open(file_path);
     for (auto row = this->Begin(); row != this->End(); ++row) {
       for (auto field = row->Begin(); field != row->End(); ++field) {
-        file_stream << field->GetValue(this->separator_);
+        file_stream << field->GetValueEscaped(this->separator_);
         if (std::next(field) != row->End()) {
           file_stream << this->separator_;
         }
@@ -515,3 +549,6 @@ class CsvParser {
     }
   }
 };
+
+}  // namespace csvpp
+#endif  // CSVPP_HPP
