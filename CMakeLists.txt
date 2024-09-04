@@ -3,4 +3,4 @@ set(CMAKE_CXX_STANDARD 17)
 
 project(csvpp)
 
-add_executable(csvpp csvpp/csvpp.cpp)
+add_executable(csvpp csvpp/main.cpp)

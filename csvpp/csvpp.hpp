@@ -515,26 +515,3 @@ class CsvParser {
     }
   }
 };
-
-int main(int argc, char *argv[]) {
-  try {
-    /*
-  Csv csv2;
-  csv2.AddHeaderRow({"one", "two", "three", "four"});
-  csv2.AddDataRow({"\"hello\"", "csv\nis\"cool", 123, 1.234});
-  csv2.AddDataRow({"hel;lo", "cs\"v", 123, 1.234});
-  csv2.SaveToFile("./test.csv");
-*/
-    CsvParser csv_parser;
-    auto csv = csv_parser.Parse("test.csv");
-    csv.Print();
-    std::cout << std::endl;
-    csv.PrintDataOnly();
-
-    std::cout << "Value at row 0, index 0: " << csv.RowAt(1).ValueAt(0) << "\n";
-
-  } catch (const std::exception &ex) {
-    std::cout << ex.what() << "\n";
-  }
-  return 0;
-}
