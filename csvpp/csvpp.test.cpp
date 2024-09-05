@@ -1,5 +1,7 @@
 #include "csvpp.hpp"
 
+#include <filesystem>
+
 #include "gtest/gtest.h"
 
 // Unit tests for the Field class public interface.
@@ -182,4 +184,50 @@ TEST_F(CsvTest, GetHeaderRow) {
 TEST_F(CsvTest, GetEmptyRowForHeadlesCsv) {
   auto header = csv_data_only_.GetHeaderRow();
   EXPECT_EQ(static_cast<int>(header.GetWidth()), 0);
+}
+
+/// Unit tests for CsvParser pulic interface.
+
+class CsvParserTest : public testing::Test {
+ protected:
+  CsvParserTest() {
+    csv_.AddHeaderRow({"header1", "header2", "header3"});
+    csv_.AddDataRow({"value1", "value2", "value3"});
+    csv_.AddDataRow({"with\nlinebreak", "with\"quote", "\"quoted\""});
+    csv_.AddDataRow({"sepa,rated", "endquote\"", "\"startquote"});
+  };
+
+  csvpp::Csv csv_;
+};
+
+TEST_F(CsvParserTest, ParseCsvFile) {
+  // Create the file
+  csv_.SaveToFile("test.csv");
+
+  // Parse from the file
+  csvpp::CsvParser parser;
+  auto csv = parser.Parse("test.csv");
+
+  // test
+  auto header_row = csv_.GetHeaderRow();
+  EXPECT_STREQ(header_row.ValueAt(0).c_str(), "header1");
+  EXPECT_STREQ(header_row.ValueAt(1).c_str(), "header2");
+  EXPECT_STREQ(header_row.ValueAt(2).c_str(), "header3");
+
+  auto row_one = csv_.DataRowAt(0);
+  EXPECT_STREQ(row_one.ValueAt(0).c_str(), "value1");
+  EXPECT_STREQ(row_one.ValueAt(1).c_str(), "value2");
+  EXPECT_STREQ(row_one.ValueAt(2).c_str(), "value3");
+
+  auto row_two = csv_.DataRowAt(1);
+  EXPECT_STREQ(row_two.ValueAt(0).c_str(), "with\nlinebreak");
+  EXPECT_STREQ(row_two.ValueAt(1).c_str(), "with\"quote");
+  EXPECT_STREQ(row_two.ValueAt(2).c_str(), "\"quoted\"");
+
+  auto row_three = csv_.DataRowAt(2);
+  EXPECT_STREQ(row_three.ValueAt(0).c_str(), "sepa,rated");
+  EXPECT_STREQ(row_three.ValueAt(1).c_str(), "endquote\"");
+  EXPECT_STREQ(row_three.ValueAt(2).c_str(), "\"startquote");
+
+  std::filesystem::remove("test.csv");
 }
