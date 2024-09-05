@@ -44,68 +44,19 @@
 
 namespace csvpp {
 
-/// Exception for insertion of rows with invalid width.
-class InvalidRowWidthException : public std::exception {
+/// Custom exception
+class CsvppException : public std::exception {
  public:
-  InvalidRowWidthException(const size_t max_width, const size_t row_width)
-      : message_{"Invalid attempt to insert row of width " +
-                 std::to_string(row_width) + " when width must be " +
-                 std::to_string(max_width)} {}
+  CsvppException(const int error_code, const std::string message, ...)
+      : error_code_(error_code), message_(std::move(message)){};
 
   const char *what() const noexcept override { return this->message_.c_str(); };
 
- private:
-  std::string message_;
-};
-
-/// Exception for insertion of a header row at non-zero index.
-class InvalidHeaderRowInsertionException : public std::exception {
- public:
-  InvalidHeaderRowInsertionException(const size_t current_row_count)
-      : message_{"Invalid attempt to set header row at row index " +
-                 std::to_string(current_row_count + 1)} {};
-
-  const char *what() const noexcept override { return this->message_.c_str(); };
+  /// The error code is helpful for testing.
+  int ErrorCode() const { return this->error_code_; };
 
  private:
-  std::string message_;
-};
-
-/// Exception for out of bound row access.
-class OutOfBoundRowAccessException : public std::exception {
- public:
-  OutOfBoundRowAccessException(const int num_rows, const size_t index)
-      : message_{"Failed to access row at index " + std::to_string(index) +
-                 " because the Csv only contains " + std::to_string(num_rows) +
-                 " rows"} {};
-
-  const char *what() const noexcept override { return this->message_.c_str(); };
-
- private:
-  std::string message_;
-};
-
-// Expection for invalid row access to empty Csv.
-class EmptyCsvRowAccessException : public std::exception {
- public:
-  EmptyCsvRowAccessException() = default;
-
-  const char *what() const noexcept override {
-    return "Failed to access row because the Csv is empty";
-  };
-};
-
-/// Custom exception for out of bound row access.
-class OutOfBoundFieldAccessException : public std::exception {
- public:
-  OutOfBoundFieldAccessException(const size_t width, const int index)
-      : message_{"Failed to access field value at index " +
-                 std::to_string(index) + " because the Row only contains " +
-                 std::to_string(width) + " fields"} {};
-
-  const char *what() const noexcept override { return this->message_.c_str(); };
-
- private:
+  int error_code_;
   std::string message_;
 };
 
@@ -190,10 +141,11 @@ class Row {
   /// Adds the value to the row
   void AddValue(const Field &field) { this->fields_.push_back(field); }
 
-  /// Returns the value at the field index.
+  /// Returns the value at the field index. It throws a CsvppException if the
+  /// index is out of bounds.
   std::string ValueAt(const int index) const {
     if (index > this->GetWidth() - 1) {
-      throw OutOfBoundFieldAccessException(this->GetWidth(), index);
+      throw CsvppException(100, "Row::GetWidth index out of bound error");
     }
     return this->fields_[static_cast<size_t>(index)].GetValue();
   }
@@ -229,7 +181,7 @@ class Csv {
   void AddDataRow(const Row &row) {
     if (this->IsWidthInitialized() &&
         (this->GetAllowedWidth() != row.GetWidth())) {
-      throw InvalidRowWidthException(this->GetAllowedWidth(), row.GetWidth());
+      throw CsvppException(200, "Csv::AddDataRow invalid width error");
     }
     this->InitializeWidth(row.GetWidth());
     this->PushRow(row);
@@ -242,10 +194,11 @@ class Csv {
   }
 
   /// Adds a header row to the CSV. When calling this method after AddDataRow()
-  /// an InvalidHeaderRowInsertionException will be trown.
+  /// an CsvppException will be trown.
   void AddHeaderRow(const Row &row) {
     if (!this->IsEmpty()) {
-      throw InvalidHeaderRowInsertionException(this->GetRowCount());
+      throw CsvppException(
+          300, "Csv::AddHeaderRow csv must only have one header row");
     }
     this->InitializeWidth(row.GetWidth());
     this->PushRow(row);
@@ -253,30 +206,30 @@ class Csv {
   }
 
   /// Adds a header row to the CSV. When calling this method after AddDataRow()
-  /// an InvalidHeaderRowInsertionException will be trown.
+  /// an CsvppException will be trown.
   void AddHeaderRow(std::initializer_list<Field> values) {
     const Row row(values);
     this->AddHeaderRow(row);
   }
 
   /// Returns the row at the specified index. It throws an
-  /// EmptyCsvRowAccessException when trying to get a row from an empty Csv and
-  /// a OutOfBoundRowAccessException when trying to access a row that is
+  /// CsvppException when trying to get a row from an empty Csv and
+  /// a CsvppException when trying to access a row that is
   /// outsidethe row count.
   Row RowAt(const int index) const {
     if (this->IsEmpty()) {
-      throw EmptyCsvRowAccessException();
+      throw CsvppException(400, "Csv::RowAt empty csv row access exception");
     }
     if (this->GetRowCount() + 1 < index) {
-      throw OutOfBoundRowAccessException(index, this->GetRowCount());
+      throw CsvppException(100, "Row::RowAt index out of bound error");
     }
     return this->rows_[static_cast<size_t>(index)];
   }
 
   /// Returns the data row at index. If the Csv has a header row and index = 0
   /// is specified, the first row after the header row is returned. It throws an
-  /// EmptyCsvRowAccessException when trying to get a row from an empty Csv and
-  /// a OutOfBoundRowAccessException when trying to access a row that is outside
+  /// CsvppException when trying to get a row from an empty Csv and
+  /// a CsvppException when trying to access a row that is outside
   /// the row count.
   Row DataRowAt(const int index) const {
     int first_data_index = this->has_header_row_ ? index + 1 : index;
@@ -284,11 +237,11 @@ class Csv {
   }
 
   /// Returns the header row or an empty row if there is no header row.
-  /// It throws an EmptyCsvRowAccessException when trying to get a row from an
+  /// It throws an CsvppException when trying to get a row from an
   /// empty Csv.
   Row GetHeaderRow() const {
     if (this->IsEmpty()) {
-      throw EmptyCsvRowAccessException();
+      throw CsvppException(400, "Csv::RowAt empty csv row access exception");
     }
     if (this->has_header_row_) {
       return this->rows_[0];
@@ -334,6 +287,9 @@ class Csv {
   void SaveToFile(const std::string &file_path) const {
     std::ofstream file_stream;
     file_stream.open(file_path);
+    if (!file_stream.is_open()) {
+      throw CsvppException(500, "Csv::SaveToFile Error opening file");
+    }
     for (auto row = this->Begin(); row != this->End(); ++row) {
       for (auto field = row->Begin(); field != row->End(); ++field) {
         file_stream << field->GetValueEscaped(this->separator_);
