@@ -53,18 +53,6 @@ TEST(Field, GetValueEscapedQuotedQuote) {
 
 // Unit tests for the Row class public interface.
 
-// Test fixture for the Row class
-class RowTest : public testing::Test {
- protected:
-  RowTest() {
-    row0_.AddValue("value1");
-    row0_.AddValue("value2");
-    row0_.AddValue("value3");
-  }
-
-  csvpp::Row row0_;
-};
-
 TEST(RowTest, AddAndGetValue) {
   csvpp::Row row;
   row.AddValue("value1");
@@ -76,10 +64,12 @@ TEST(RowTest, OutOfBoundFieldAccessException) {
   bool did_catch_exception{false};
   try {
     auto value = row.ValueAt(4);
-  } catch (csvpp::OutOfBoundFieldAccessException &ex) {
-    if (ex.what()) {
+  } catch (csvpp::CsvppException &ex) {
+    if (ex.ErrorCode() == csvpp::kOutOfBoundFieldAccessErrorCode) {
       did_catch_exception = true;
     }
+  } catch (std::exception &ex) {
+    FAIL() << ex.what();
   }
   EXPECT_TRUE(did_catch_exception);
 }
@@ -122,16 +112,19 @@ class CsvTest : public testing::Test {
 
   csvpp::Csv csv_with_header_;
   csvpp::Csv csv_data_only_;
+  csvpp::Csv csv_empty_;
 };
 
 TEST_F(CsvTest, InvalidRowWidth) {
   bool did_catch_exception{false};
   try {
     csv_data_only_.AddDataRow({"value4_1", "value4_2", "value4_3", "value4_4"});
-  } catch (csvpp::InvalidRowWidthException &ex) {
-    if (ex.what()) {
+  } catch (csvpp::CsvppException &ex) {
+    if (ex.ErrorCode() == csvpp::kInvalidRowWidthErrorCode) {
       did_catch_exception = true;
     }
+  } catch (std::exception &ex) {
+    FAIL() << ex.what();
   }
   EXPECT_TRUE(did_catch_exception);
 }
@@ -140,21 +133,22 @@ TEST_F(CsvTest, InvalidHeaderRowInsertionException) {
   bool did_catch_exception{false};
   try {
     csv_with_header_.AddHeaderRow({"header1", "header2", "header3"});
-  } catch (csvpp::InvalidHeaderRowInsertionException &ex) {
-    if (ex.what()) {
+  } catch (csvpp::CsvppException &ex) {
+    if (ex.ErrorCode() == csvpp::kInvalidHeaderRowInsertionErrorCode) {
       did_catch_exception = true;
     }
+  } catch (std::exception &ex) {
+    FAIL() << ex.what();
   }
   EXPECT_TRUE(did_catch_exception);
 }
 
-TEST(CsvTest, EmptyCsvRowAccessException) {
+TEST_F(CsvTest, EmptyCsvRowAccessException) {
   bool did_catch_exception{false};
-  csvpp::Csv csv;
   try {
-    auto value = csv.RowAt(1);
-  } catch (csvpp::EmptyCsvRowAccessException &ex) {
-    if (ex.what()) {
+    auto value = csv_empty_.RowAt(1);
+  } catch (csvpp::CsvppException &ex) {
+    if (ex.ErrorCode() == csvpp::kEmptyCsvRowAccessErrorCode) {
       did_catch_exception = true;
     }
   }
@@ -165,10 +159,12 @@ TEST_F(CsvTest, OutOfBoundRowAccessException) {
   bool did_catch_exception{false};
   try {
     auto value = csv_data_only_.RowAt(3);
-  } catch (csvpp::OutOfBoundRowAccessException &ex) {
-    if (ex.what()) {
+  } catch (csvpp::CsvppException &ex) {
+    if (ex.ErrorCode() == csvpp::kOutOfBoundRowAccessErrorCode) {
       did_catch_exception = true;
     }
+  } catch (std::exception &ex) {
+    FAIL() << ex.what();
   }
   EXPECT_TRUE(did_catch_exception);
 }

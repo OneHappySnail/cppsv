@@ -60,6 +60,14 @@ class CsvppException : public std::exception {
   std::string message_;
 };
 
+/// Error codes
+constexpr int kErrorBase = 100;
+constexpr int kOutOfBoundFieldAccessErrorCode = kErrorBase + 1;
+constexpr int kInvalidRowWidthErrorCode = kErrorBase + 2;
+constexpr int kInvalidHeaderRowInsertionErrorCode = kErrorBase + 3;
+constexpr int kEmptyCsvRowAccessErrorCode = kErrorBase + 4;
+constexpr int kOutOfBoundRowAccessErrorCode = kErrorBase + 5;
+
 /// A Field represents an individual value in the CSV.
 /// All values are stored as std::string.
 class Field {
@@ -145,7 +153,8 @@ class Row {
   /// index is out of bounds.
   std::string ValueAt(const int index) const {
     if (index > this->GetWidth() - 1) {
-      throw CsvppException(100, "Row::GetWidth index out of bound error");
+      throw CsvppException(kOutOfBoundFieldAccessErrorCode,
+                           "Row::GetWidth index out of bound error");
     }
     return this->fields_[static_cast<size_t>(index)].GetValue();
   }
@@ -181,7 +190,8 @@ class Csv {
   void AddDataRow(const Row &row) {
     if (this->IsWidthInitialized() &&
         (this->GetAllowedWidth() != row.GetWidth())) {
-      throw CsvppException(200, "Csv::AddDataRow invalid width error");
+      throw CsvppException(kInvalidRowWidthErrorCode,
+                           "Csv::AddDataRow invalid width error");
     }
     this->InitializeWidth(row.GetWidth());
     this->PushRow(row);
@@ -198,7 +208,8 @@ class Csv {
   void AddHeaderRow(const Row &row) {
     if (!this->IsEmpty()) {
       throw CsvppException(
-          300, "Csv::AddHeaderRow csv must only have one header row");
+          kInvalidHeaderRowInsertionErrorCode,
+          "Csv::AddHeaderRow csv must only have one header row");
     }
     this->InitializeWidth(row.GetWidth());
     this->PushRow(row);
@@ -218,10 +229,12 @@ class Csv {
   /// outsidethe row count.
   Row RowAt(const int index) const {
     if (this->IsEmpty()) {
-      throw CsvppException(400, "Csv::RowAt empty csv row access exception");
+      throw CsvppException(kEmptyCsvRowAccessErrorCode,
+                           "Csv::RowAt empty csv row access exception");
     }
-    if (this->GetRowCount() + 1 < index) {
-      throw CsvppException(100, "Row::RowAt index out of bound error");
+    if (index > this->GetRowCount() - 1) {
+      throw CsvppException(kOutOfBoundRowAccessErrorCode,
+                           "Row::RowAt index out of bound error");
     }
     return this->rows_[static_cast<size_t>(index)];
   }
@@ -241,7 +254,8 @@ class Csv {
   /// empty Csv.
   Row GetHeaderRow() const {
     if (this->IsEmpty()) {
-      throw CsvppException(400, "Csv::RowAt empty csv row access exception");
+      throw CsvppException(kEmptyCsvRowAccessErrorCode,
+                           "Csv::RowAt empty csv row access exception");
     }
     if (this->has_header_row_) {
       return this->rows_[0];

@@ -6,8 +6,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 project(csvpp)
 
 # Testing
-option(DO_TEST "Build and run tests" OFF)
-if(DO_TEST)
+option(CSVPP_DO_TEST "Build and run tests" OFF)
+if(CSVPP_DO_TEST)
     include(FetchContent)
     FetchContent_Declare(
         googletest
@@ -31,6 +31,17 @@ if(DO_TEST)
 
     include(GoogleTest)
     gtest_discover_tests(csvpp)
-else()
+endif(CSVPP_DO_TEST)
+
+# Header only library
+option(CSVPP_HEADER_ONLY_LIBRARY "Only include the interface library" OFF)
+if(CSVPP_HEADER_ONLY_LIBRARY)
     add_library(csvpp INTERFACE csvpp/csvpp.hpp)
-endif(DO_TEST)
+endif(CSVPP_HEADER_ONLY_LIBRARY)
+
+# Playground
+option(CSVPP_PLAYGROUND "For testing and development purposes" OFF)
+if(CSVPP_PLAYGROUND)
+    add_executable(csvpp main.cpp)
+endif(CSVPP_PLAYGROUND)
+
