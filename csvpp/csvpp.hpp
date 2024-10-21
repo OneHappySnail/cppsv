@@ -32,6 +32,7 @@
 #define CSVPP_HPP
 
 #include <exception>
+#include <filesystem>
 #include <fstream>
 #include <functional>
 #include <initializer_list>
@@ -298,7 +299,7 @@ class Csv {
   }
 
   /// Saves the CSV to a file.
-  void SaveToFile(const std::string &file_path) const {
+  void SaveToFile(const std::filesystem::path file_path) const {
     std::ofstream file_stream;
     file_stream.open(file_path);
     if (!file_stream.is_open()) {
@@ -349,7 +350,7 @@ class CsvParser {
   /// Parses the specified file into a Csv using the default separator ',' if
   /// not specified otherwise. By default it expects the csv file to have a
   /// header row.
-  Csv Parse(const std::string file_path, const char separator = ',',
+  Csv Parse(const std::filesystem::path file_path, const char separator = ',',
             bool has_header_row = true) {
     std::ifstream file_stream;
     file_stream.open(file_path);
